@@ -15,6 +15,7 @@ DROP TABLE IF EXISTS `chat_message`;
 DROP TABLE IF EXISTS `conversation`;
 DROP TABLE IF EXISTS `review`;
 DROP TABLE IF EXISTS `task_order`;
+DROP TABLE IF EXISTS `demand_favorite`;
 DROP TABLE IF EXISTS `demand_application`;
 DROP TABLE IF EXISTS `teamup_demand_detail`;
 DROP TABLE IF EXISTS `tutoring_demand_detail`;

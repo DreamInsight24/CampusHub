@@ -42,6 +42,11 @@ const router = createRouter({
           component: () => import('@/views/MyDemandsView.vue'),
         },
         {
+          path: 'demands/favorites',
+          name: 'favorite-demands',
+          component: () => import('@/views/FavoriteDemandsView.vue'),
+        },
+        {
           path: 'demands/:id',
           name: 'demand-detail',
           component: () => import('@/views/DemandDetailView.vue'),

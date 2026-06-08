@@ -51,6 +51,19 @@
         <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
+    <resultMap id="TeamupDemandDetailResultMap" type="com.campushub.entity.demand.TeamupDemandDetail">
+        <id column="demand_uuid" property="demand_uuid"/>
+        <result column="team_goal" property="team_goal"/>
+        <result column="current_members" property="current_members"/>
+        <result column="expected_members" property="expected_members"/>
+        <result column="required_skills" property="required_skills" typeHandler="com.campushub.util.JsonListTypeHandler"/>
+        <result column="deadline" property="deadline"/>
+        <result column="contact_method" property="contact_method"/>
+        <result column="image_urls" property="image_urls" typeHandler="com.campushub.util.JsonListTypeHandler"/>
+        <result column="description" property="description"/>
+        <result column="dialog_uuid" property="dialog_uuid"/>
+    </resultMap>
+
     <resultMap id="DemandDetailResultMap" type="com.campushub.vo.demand.DemandDetailVO">
         <id column="id" property="id"/>
         <result column="title" property="title"/>
@@ -152,6 +165,11 @@
         )
     </insert>
 
+    <insert id="insertDemandFavorite">
+        INSERT IGNORE INTO demand_favorite (user_uuid, demand_uuid)
+        VALUES (#{user_uuid}, #{demand_uuid})
+    </insert>
+
     <update id="updateDemandStat">
         UPDATE demand
         SET stat = #{stat},
@@ -216,8 +234,20 @@
           AND status = 'PENDING'
     </update>
 
+    <delete id="deleteDemandFavorite">
+        DELETE FROM demand_favorite
+        WHERE user_uuid = #{user_uuid}
+          AND demand_uuid = #{demand_uuid}
+    </delete>
+
     <select id="selectDemandByUuid" resultMap="DemandEntityResultMap">
         SELECT * FROM demand WHERE uuid = #{uuid}
+    </select>
+
+    <select id="selectTeamupDemandDetailByDemandUuid" resultMap="TeamupDemandDetailResultMap">
+        SELECT *
+        FROM teamup_demand_detail
+        WHERE demand_uuid = #{demand_uuid}
     </select>
 
     <sql id="DemandSearchWhere">
@@ -365,6 +395,13 @@
                  AND da.status = 'ACCEPTED'
            )
         ORDER BY d.update_time DESC
+    </select>
+
+    <select id="selectFavoriteDemandDetails" resultMap="DemandDetailResultMap">
+        <include refid="DemandDetailSelect"/>
+        INNER JOIN demand_favorite df ON d.uuid = df.demand_uuid
+        WHERE df.user_uuid = #{user_uuid}
+        ORDER BY df.create_time DESC
     </select>
 
     <sql id="DemandApplicationSelect">

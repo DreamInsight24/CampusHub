@@ -29,15 +29,19 @@ import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockMultipartFile;
 
 import com.campushub.common.Result;
+import com.campushub.common.enums.DemandApplicationStatus;
 import com.campushub.common.enums.DemandStat;
 import com.campushub.common.enums.DemandType;
 import com.campushub.dto.demand.DemandCreateDTO;
 import com.campushub.dto.demand.DemandQueryDTO;
 import com.campushub.entity.demand.Demand;
+import com.campushub.entity.demand.DemandApplication;
+import com.campushub.entity.demand.TeamupDemandDetail;
 import com.campushub.mapper.DemandMapper;
 import com.campushub.service.auth.AuthService;
 import com.campushub.vo.PageVO;
 import com.campushub.vo.UploadVO;
+import com.campushub.vo.demand.DemandApplicationVO;
 import com.campushub.vo.demand.DemandCreateVO;
 import com.campushub.vo.demand.DemandDetailVO;
 import com.campushub.vo.demand.DemandListVO;
@@ -398,15 +402,15 @@ class DemandServiceTest {
         }
 
         @Test
-        @DisplayName("should respond to demand successfully")
+        @DisplayName("should apply to demand successfully")
         void respondDemandSuccess() {
             Demand demandWithDifferentPublisher = new Demand();
             demandWithDifferentPublisher.setUuid(demandUuid);
             demandWithDifferentPublisher.setPublisher_uuid(takerUuid); // different from responder
             demandWithDifferentPublisher.setStat(DemandStat.OPEN);
+            demandWithDifferentPublisher.setType(DemandType.EXPRESS);
 
             when(demandMapper.selectDemandByUuid(demandUuid)).thenReturn(demandWithDifferentPublisher);
-            when(demandMapper.updateDemandTaker(demandUuid, publisherUuid)).thenReturn(1);
 
             DemandDetailVO detail = new DemandDetailVO();
             detail.setId(demandUuid.toString());
@@ -416,7 +420,8 @@ class DemandServiceTest {
 
             assertEquals(200, result.getCode());
             assertNotNull(result.getData());
-            verify(demandMapper).updateDemandTaker(demandUuid, publisherUuid);
+            verify(demandMapper).insertDemandApplication(any(DemandApplication.class));
+            verify(demandMapper, never()).updateDemandTaker(any(), any());
         }
 
         @Test
@@ -429,6 +434,7 @@ class DemandServiceTest {
             assertEquals(401, result.getCode());
             assertEquals("请先登录", result.getMessage());
             verify(demandMapper, never()).updateDemandTaker(any(), any());
+            verify(demandMapper, never()).insertDemandApplication(any());
         }
 
         @Test
@@ -441,6 +447,7 @@ class DemandServiceTest {
             assertEquals(404, result.getCode());
             assertEquals("需求不存在", result.getMessage());
             verify(demandMapper, never()).updateDemandTaker(any(), any());
+            verify(demandMapper, never()).insertDemandApplication(any());
         }
 
         @Test
@@ -451,23 +458,29 @@ class DemandServiceTest {
             Result<DemandDetailVO> result = demandService.respondDemand(validToken, demandUuid);
 
             assertEquals(400, result.getCode());
-            assertEquals("不能接取自己发布的需求", result.getMessage());
+            assertEquals("不能申请自己发布的需求", result.getMessage());
             verify(demandMapper, never()).updateDemandTaker(any(), any());
+            verify(demandMapper, never()).insertDemandApplication(any());
         }
 
         @Test
-        @DisplayName("should return 409 when demand already has a taker")
-        void respondDemandAlreadyTaken() {
+        @DisplayName("should return 409 when already applied")
+        void respondDemandAlreadyApplied() {
             openDemand.setPublisher_uuid(takerUuid); // different publisher
-            openDemand.setTaker_uuid(UUID.randomUUID()); // already taken
+            openDemand.setType(DemandType.EXPRESS);
 
             when(demandMapper.selectDemandByUuid(demandUuid)).thenReturn(openDemand);
+            DemandApplicationVO existing = new DemandApplicationVO();
+            existing.setId(UUID.randomUUID().toString());
+            when(demandMapper.selectDemandApplicationByDemandAndApplicant(demandUuid, publisherUuid))
+                    .thenReturn(existing);
 
             Result<DemandDetailVO> result = demandService.respondDemand(validToken, demandUuid);
 
             assertEquals(409, result.getCode());
-            assertEquals("该需求已被接取", result.getMessage());
+            assertEquals("已申请，请等待发布者确认", result.getMessage());
             verify(demandMapper, never()).updateDemandTaker(any(), any());
+            verify(demandMapper, never()).insertDemandApplication(any());
         }
 
         @Test
@@ -483,25 +496,110 @@ class DemandServiceTest {
             Result<DemandDetailVO> result = demandService.respondDemand(validToken, demandUuid);
 
             assertEquals(400, result.getCode());
-            assertEquals("该需求当前不可接取", result.getMessage());
+            assertEquals("该需求当前不可申请", result.getMessage());
             verify(demandMapper, never()).updateDemandTaker(any(), any());
+            verify(demandMapper, never()).insertDemandApplication(any());
         }
 
         @Test
-        @DisplayName("should return 409 when concurrent update fails (optimistic lock)")
-        void respondDemandConcurrentUpdate() {
+        @DisplayName("should return 400 when secondhand demand is applied")
+        void respondSecondhandDemand() {
             Demand demandWithDifferentPublisher = new Demand();
             demandWithDifferentPublisher.setUuid(demandUuid);
             demandWithDifferentPublisher.setPublisher_uuid(takerUuid);
             demandWithDifferentPublisher.setStat(DemandStat.OPEN);
+            demandWithDifferentPublisher.setType(DemandType.SECONDHAND);
 
             when(demandMapper.selectDemandByUuid(demandUuid)).thenReturn(demandWithDifferentPublisher);
-            when(demandMapper.updateDemandTaker(demandUuid, publisherUuid)).thenReturn(0);
 
             Result<DemandDetailVO> result = demandService.respondDemand(validToken, demandUuid);
 
-            assertEquals(409, result.getCode());
-            assertEquals("该需求已被其他用户接取", result.getMessage());
+            assertEquals(400, result.getCode());
+            assertEquals("二手交易不支持申请或接取，请先联系发布者沟通", result.getMessage());
+            verify(demandMapper, never()).updateDemandTaker(any(), any());
+            verify(demandMapper, never()).insertDemandApplication(any());
+        }
+    }
+
+    // ==================== acceptApplication ====================
+
+    @Nested
+    @DisplayName("acceptApplication Tests")
+    class AcceptApplicationTests {
+
+        private UUID applicationUuid;
+        private Demand teamupDemand;
+        private DemandApplication pendingApplication;
+
+        @BeforeEach
+        void setUp() {
+            applicationUuid = UUID.randomUUID();
+
+            teamupDemand = new Demand();
+            teamupDemand.setUuid(demandUuid);
+            teamupDemand.setPublisher_uuid(publisherUuid);
+            teamupDemand.setStat(DemandStat.OPEN);
+            teamupDemand.setType(DemandType.TEAMUP);
+
+            pendingApplication = new DemandApplication();
+            pendingApplication.setUuid(applicationUuid);
+            pendingApplication.setDemandUuid(demandUuid);
+            pendingApplication.setApplicantUuid(takerUuid);
+            pendingApplication.setStatus(DemandApplicationStatus.PENDING);
+        }
+
+        @Test
+        @DisplayName("should keep other pending applications when team still has seats")
+        void acceptTeamupApplicationWithRemainingSeats() {
+            TeamupDemandDetail detail = new TeamupDemandDetail();
+            detail.setDemand_uuid(demandUuid);
+            detail.setCurrent_members(2);
+            detail.setExpected_members(4);
+
+            DemandDetailVO resultDetail = new DemandDetailVO();
+            resultDetail.setId(demandUuid.toString());
+            resultDetail.setType(DemandType.TEAMUP);
+
+            when(demandMapper.selectDemandByUuid(demandUuid)).thenReturn(teamupDemand);
+            when(demandMapper.selectDemandApplicationByUuid(applicationUuid)).thenReturn(pendingApplication);
+            when(demandMapper.selectTeamupDemandDetailByDemandUuid(demandUuid)).thenReturn(detail);
+            when(demandMapper.selectDemandDetailByUuid(demandUuid)).thenReturn(resultDetail);
+
+            Result<DemandDetailVO> result = demandService.acceptApplication(validToken, demandUuid, applicationUuid);
+
+            assertEquals(200, result.getCode());
+            verify(demandMapper).updateDemandApplicationStatus(applicationUuid, DemandApplicationStatus.ACCEPTED);
+            verify(demandMapper).updateTeamupCurrentMembers(demandUuid);
+            verify(demandMapper, never()).expireOtherPendingApplications(any(), any());
+            verify(demandMapper, never()).updateDemandStat(any(), any());
+            verify(demandMapper, never()).updateDemandTaker(any(), any());
+        }
+
+        @Test
+        @DisplayName("should expire other pending applications when team becomes full")
+        void acceptTeamupApplicationWhenTeamBecomesFull() {
+            TeamupDemandDetail detail = new TeamupDemandDetail();
+            detail.setDemand_uuid(demandUuid);
+            detail.setCurrent_members(3);
+            detail.setExpected_members(4);
+
+            DemandDetailVO resultDetail = new DemandDetailVO();
+            resultDetail.setId(demandUuid.toString());
+            resultDetail.setType(DemandType.TEAMUP);
+
+            when(demandMapper.selectDemandByUuid(demandUuid)).thenReturn(teamupDemand);
+            when(demandMapper.selectDemandApplicationByUuid(applicationUuid)).thenReturn(pendingApplication);
+            when(demandMapper.selectTeamupDemandDetailByDemandUuid(demandUuid)).thenReturn(detail);
+            when(demandMapper.selectDemandDetailByUuid(demandUuid)).thenReturn(resultDetail);
+
+            Result<DemandDetailVO> result = demandService.acceptApplication(validToken, demandUuid, applicationUuid);
+
+            assertEquals(200, result.getCode());
+            verify(demandMapper).updateDemandApplicationStatus(applicationUuid, DemandApplicationStatus.ACCEPTED);
+            verify(demandMapper).updateTeamupCurrentMembers(demandUuid);
+            verify(demandMapper).updateDemandStat(demandUuid, DemandStat.IN_PROGRESS);
+            verify(demandMapper).expireOtherPendingApplications(demandUuid, applicationUuid);
+            verify(demandMapper, never()).updateDemandTaker(any(), any());
         }
     }
 

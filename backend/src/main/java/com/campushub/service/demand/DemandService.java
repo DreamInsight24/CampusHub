@@ -62,7 +62,7 @@ public class DemandService {
         return new PageVO<>(items, total, query.getPage(), query.getPageSize());
     }
 
-    public Result<DemandDetailVO> getDemandDetail(UUID demandUuid) {
+    public Result<DemandDetailVO> getDemandDetail(String token, UUID demandUuid) {
         if (demandUuid == null) {
             return Result.error(400, "需求ID不能为空");
         }
@@ -72,6 +72,25 @@ public class DemandService {
             return Result.error(404, "需求不存在");
         }
 
+        applySensitiveVisibility(detail, authService.getUserUuidByToken(token));
+        return Result.success(detail);
+    }
+
+    public Result<DemandDetailVO> getDemandDetail(UUID demandUuid) {
+        return getDemandDetail(demandUuid, null);
+    }
+
+    private Result<DemandDetailVO> getDemandDetail(UUID demandUuid, UUID viewerUuid) {
+        if (demandUuid == null) {
+            return Result.error(400, "需求ID不能为空");
+        }
+
+        DemandDetailVO detail = demandMapper.selectDemandDetailByUuid(demandUuid);
+        if (detail == null) {
+            return Result.error(404, "需求不存在");
+        }
+
+        applySensitiveVisibility(detail, viewerUuid);
         return Result.success(detail);
     }
 
@@ -81,7 +100,9 @@ public class DemandService {
             return Result.error(401, "请先登录");
         }
 
-        return Result.success(demandMapper.selectPublishedDemandDetails(userUuid));
+        List<DemandDetailVO> details = demandMapper.selectPublishedDemandDetails(userUuid);
+        details.forEach(detail -> applySensitiveVisibility(detail, userUuid));
+        return Result.success(details);
     }
 
     public Result<List<DemandDetailVO>> listMyAcceptedDemands(String token) {
@@ -90,7 +111,20 @@ public class DemandService {
             return Result.error(401, "请先登录");
         }
 
-        return Result.success(demandMapper.selectAcceptedDemandDetails(userUuid));
+        List<DemandDetailVO> details = demandMapper.selectAcceptedDemandDetails(userUuid);
+        details.forEach(detail -> applySensitiveVisibility(detail, userUuid));
+        return Result.success(details);
+    }
+
+    public Result<List<DemandDetailVO>> listMyFavoriteDemands(String token) {
+        UUID userUuid = authService.getUserUuidByToken(token);
+        if (userUuid == null) {
+            return Result.error(401, "请先登录");
+        }
+
+        List<DemandDetailVO> details = demandMapper.selectFavoriteDemandDetails(userUuid);
+        details.forEach(detail -> applySensitiveVisibility(detail, userUuid));
+        return Result.success(details);
     }
 
     @Transactional
@@ -110,41 +144,31 @@ public class DemandService {
             return Result.error(404, "需求不存在");
         }
         if (userUuid.equals(demand.getPublisher_uuid())) {
-            return Result.error(400, "不能接取自己发布的需求");
+            return Result.error(400, "不能申请自己发布的需求");
         }
         if (demand.getStat() != DemandStat.OPEN) {
-            return Result.error(400, "该需求当前不可接取");
+            return Result.error(400, "该需求当前不可申请");
+        }
+        if (!isApplicationDemand(demand.getType())) {
+            return Result.error(400, "二手交易不支持申请或接取，请先联系发布者沟通");
         }
 
-        if (isApplicationDemand(demand.getType())) {
-            DemandApplicationVO existing = demandMapper.selectDemandApplicationByDemandAndApplicant(demandUuid, userUuid);
-            if (existing != null) {
-                return Result.error(409, "已申请，请等待发布者确认");
-            }
-
-            DemandApplication application = new DemandApplication();
-            LocalDateTime now = LocalDateTime.now();
-            application.setUuid(UUID.randomUUID());
-            application.setDemandUuid(demandUuid);
-            application.setApplicantUuid(userUuid);
-            application.setStatement(dto == null ? null : trimToNull(dto.getStatement()));
-            application.setStatus(DemandApplicationStatus.PENDING);
-            application.setCreateTime(now);
-            application.setUpdateTime(now);
-            demandMapper.insertDemandApplication(application);
-            return getDemandDetail(demandUuid);
+        DemandApplicationVO existing = demandMapper.selectDemandApplicationByDemandAndApplicant(demandUuid, userUuid);
+        if (existing != null) {
+            return Result.error(409, "已申请，请等待发布者确认");
         }
 
-        if (demand.getTaker_uuid() != null) {
-            return Result.error(409, "该需求已被接取");
-        }
-
-        int updated = demandMapper.updateDemandTaker(demandUuid, userUuid);
-        if (updated == 0) {
-            return Result.error(409, "该需求已被其他用户接取");
-        }
-
-        return getDemandDetail(demandUuid);
+        DemandApplication application = new DemandApplication();
+        LocalDateTime now = LocalDateTime.now();
+        application.setUuid(UUID.randomUUID());
+        application.setDemandUuid(demandUuid);
+        application.setApplicantUuid(userUuid);
+        application.setStatement(dto == null ? null : trimToNull(dto.getStatement()));
+        application.setStatus(DemandApplicationStatus.PENDING);
+        application.setCreateTime(now);
+        application.setUpdateTime(now);
+        demandMapper.insertDemandApplication(application);
+        return getDemandDetail(demandUuid, userUuid);
     }
 
     public Result<DemandApplicationVO> getMyApplication(String token, UUID demandUuid) {
@@ -191,7 +215,7 @@ public class DemandService {
             return Result.error(403, "无权审核该需求的申请");
         }
         if (!isApplicationDemand(demand.getType())) {
-            return Result.error(400, "该需求不支持申请审核");
+            return Result.error(400, "二手交易不支持申请审核");
         }
         if (demand.getStat() != DemandStat.OPEN) {
             return Result.error(400, "该需求当前不能接受申请");
@@ -205,19 +229,41 @@ public class DemandService {
             return Result.error(409, "该申请已处理");
         }
 
-        if (normalizeType(demand.getType()) == DemandType.EXPRESS) {
-            int updated = demandMapper.updateDemandTaker(demandUuid, application.getApplicantUuid());
-            if (updated == 0) {
-                return Result.error(409, "该跑腿需求已无法接受申请");
-            }
-            demandMapper.updateDemandApplicationStatus(applicationUuid, DemandApplicationStatus.ACCEPTED);
-            demandMapper.expireOtherPendingApplications(demandUuid, applicationUuid);
-            return getDemandDetail(demandUuid);
+        if (normalizeType(demand.getType()) == DemandType.TEAMUP) {
+            return acceptTeamupApplication(demandUuid, applicationUuid, userUuid);
+        }
+
+        int updated = demandMapper.updateDemandTaker(demandUuid, application.getApplicantUuid());
+        if (updated == 0) {
+            return Result.error(409, "该需求已无法接受申请");
+        }
+        demandMapper.updateDemandApplicationStatus(applicationUuid, DemandApplicationStatus.ACCEPTED);
+        demandMapper.expireOtherPendingApplications(demandUuid, applicationUuid);
+        return getDemandDetail(demandUuid, userUuid);
+    }
+
+    private Result<DemandDetailVO> acceptTeamupApplication(UUID demandUuid, UUID applicationUuid, UUID publisherUuid) {
+        TeamupDemandDetail detail = demandMapper.selectTeamupDemandDetailByDemandUuid(demandUuid);
+        if (detail == null) {
+            return Result.error(404, "组队需求详情不存在");
+        }
+
+        int currentMembers = detail.getCurrent_members() == null ? 0 : detail.getCurrent_members();
+        Integer expectedMembers = detail.getExpected_members();
+        if (expectedMembers != null && currentMembers >= expectedMembers) {
+            return Result.error(409, "组队人数已满");
         }
 
         demandMapper.updateDemandApplicationStatus(applicationUuid, DemandApplicationStatus.ACCEPTED);
         demandMapper.updateTeamupCurrentMembers(demandUuid);
-        return getDemandDetail(demandUuid);
+
+        int nextMembers = currentMembers + 1;
+        if (expectedMembers != null && nextMembers >= expectedMembers) {
+            demandMapper.updateDemandStat(demandUuid, DemandStat.IN_PROGRESS);
+            demandMapper.expireOtherPendingApplications(demandUuid, applicationUuid);
+        }
+
+        return getDemandDetail(demandUuid, publisherUuid);
     }
 
     @Transactional
@@ -299,6 +345,35 @@ public class DemandService {
                 ? "image"
                 : file.getOriginalFilename().replace("\\", "_").replace("/", "_");
         return Result.success(new UploadVO("/api/uploads/demands/mock-" + UUID.randomUUID() + "-" + filename));
+    }
+
+    public Result<Void> favoriteDemand(String token, UUID demandUuid) {
+        UUID userUuid = authService.getUserUuidByToken(token);
+        if (userUuid == null) {
+            return Result.error(401, "请先登录");
+        }
+        if (demandUuid == null) {
+            return Result.error(400, "需求ID不能为空");
+        }
+        if (demandMapper.selectDemandByUuid(demandUuid) == null) {
+            return Result.error(404, "需求不存在");
+        }
+
+        demandMapper.insertDemandFavorite(userUuid, demandUuid);
+        return Result.success(null);
+    }
+
+    public Result<Void> unfavoriteDemand(String token, UUID demandUuid) {
+        UUID userUuid = authService.getUserUuidByToken(token);
+        if (userUuid == null) {
+            return Result.error(401, "请先登录");
+        }
+        if (demandUuid == null) {
+            return Result.error(400, "需求ID不能为空");
+        }
+
+        demandMapper.deleteDemandFavorite(userUuid, demandUuid);
+        return Result.success(null);
     }
 
     private void normalize(DemandQueryDTO query) {
@@ -401,7 +476,7 @@ public class DemandService {
             return Result.error(403, "无权操作该需求");
         }
         if (demand.getStat() == DemandStat.CLOSED || demand.getStat() == DemandStat.CANCELLED) {
-            return getDemandDetail(demandUuid);
+            return getDemandDetail(demandUuid, userUuid);
         }
 
         int updated = demandMapper.updateDemandStatByPublisher(demandUuid, userUuid, targetStat);
@@ -409,7 +484,7 @@ public class DemandService {
             return Result.error(409, "需求状态已变化，请刷新后重试");
         }
         demandMapper.expirePendingApplicationsByDemand(demandUuid);
-        return getDemandDetail(demandUuid);
+        return getDemandDetail(demandUuid, userUuid);
     }
 
     private DemandType normalizeType(DemandType type) {
@@ -418,7 +493,19 @@ public class DemandService {
 
     private boolean isApplicationDemand(DemandType type) {
         DemandType normalized = normalizeType(type);
-        return normalized == DemandType.EXPRESS || normalized == DemandType.TEAMUP;
+        return normalized != DemandType.SECONDHAND;
+    }
+
+    private void applySensitiveVisibility(DemandDetailVO detail, UUID viewerUuid) {
+        if (detail == null || detail.getType() != DemandType.EXPRESS || !StringUtils.hasText(detail.getPickupCode())) {
+            return;
+        }
+
+        boolean isPublisher = viewerUuid != null && String.valueOf(viewerUuid).equals(detail.getPublisherId());
+        boolean isTaker = viewerUuid != null && String.valueOf(viewerUuid).equals(detail.getTakerId());
+        if (!isPublisher && !isTaker) {
+            detail.setPickupCode(null);
+        }
     }
 
     private String trimToNull(String value) {

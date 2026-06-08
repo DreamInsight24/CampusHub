@@ -1,6 +1,7 @@
 package com.campushub.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,9 +51,20 @@ public class DemandController {
         return demandService.listMyAcceptedDemands(token);
     }
 
+    @GetMapping("/favorites")
+    public Result<List<DemandDetailVO>> listMyFavoriteDemands(
+            @RequestHeader(value = "token", required = false) String token) {
+        return demandService.listMyFavoriteDemands(token);
+    }
+
     @GetMapping("/{id}")
-    public Result<DemandDetailVO> getDemandDetail(@PathVariable UUID id) {
-        return demandService.getDemandDetail(id);
+    public Result<DemandDetailVO> getDemandDetail(
+            @RequestHeader(value = "token", required = false) String token,
+            @PathVariable UUID id) {
+        if (token == null || token.isBlank()) {
+            return demandService.getDemandDetail(id);
+        }
+        return demandService.getDemandDetail(token, id);
     }
 
     @PostMapping("/{id}/responses")
@@ -108,6 +120,20 @@ public class DemandController {
             @RequestHeader(value = "token", required = false) String token,
             @PathVariable UUID id) {
         return demandService.cancelDemand(token, id);
+    }
+
+    @PostMapping("/{id}/favorite")
+    public Result<Void> favoriteDemand(
+            @RequestHeader(value = "token", required = false) String token,
+            @PathVariable UUID id) {
+        return demandService.favoriteDemand(token, id);
+    }
+
+    @DeleteMapping("/{id}/favorite")
+    public Result<Void> unfavoriteDemand(
+            @RequestHeader(value = "token", required = false) String token,
+            @PathVariable UUID id) {
+        return demandService.unfavoriteDemand(token, id);
     }
 
     @PostMapping

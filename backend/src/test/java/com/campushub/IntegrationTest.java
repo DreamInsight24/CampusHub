@@ -96,12 +96,13 @@ class IntegrationTest {
                 .get("data").get("token").asText();
         System.out.println("[Integration Test] ✓ Alice logged in");
 
-        // --- Step 3: Alice posts a secondhand demand ---
+        // --- Step 3: Alice posts an express demand ---
         MvcResult demandResult = mockMvc.perform(post("/api/demands")
                         .header("token", aliceToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"type\":\"SECONDHAND\",\"title\":\"出售二手教材\","
-                                + "\"itemName\":\"数据结构\",\"price\":25.00,\"description\":\"九成新\"}"))
+                        .content("{\"type\":\"EXPRESS\",\"title\":\"帮取东门快递\","
+                                + "\"pickupLocation\":\"东门快递柜\",\"deliveryLocation\":\"6号楼\","
+                                + "\"pickupCode\":\"A123\",\"description\":\"今晚送到宿舍楼下\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.id").isNotEmpty())
@@ -139,39 +140,67 @@ class IntegrationTest {
         mockMvc.perform(get("/api/demands/{id}", demandId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.title").value("出售二手教材"))
-                .andExpect(jsonPath("$.data.status").value("OPEN"));
+                .andExpect(jsonPath("$.data.title").value("帮取东门快递"))
+                .andExpect(jsonPath("$.data.status").value("OPEN"))
+                .andExpect(jsonPath("$.data.pickupCode").doesNotExist());
         System.out.println("[Integration Test] ✓ Bob viewed demand detail");
 
-        // --- Step 7: Bob accepts the demand ---
+        // --- Step 7: Bob applies to the demand ---
         mockMvc.perform(post("/api/demands/{id}/responses", demandId)
                         .header("token", bobToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data.takerId").isNotEmpty());
-        System.out.println("[Integration Test] ✓ Bob accepted the demand");
+                .andExpect(jsonPath("$.data.takerId").doesNotExist());
+        System.out.println("[Integration Test] ✓ Bob applied to the demand");
 
-        // --- Step 8: Verify demand status changed ---
+        // --- Step 8: Alice accepts Bob's application ---
+        MvcResult applicationsResult = mockMvc.perform(get("/api/demands/{id}/applications", demandId)
+                        .header("token", aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data[0].status").value("PENDING"))
+                .andReturn();
+
+        String applicationId = objectMapper.readTree(
+                applicationsResult.getResponse().getContentAsString())
+                .get("data").get(0).get("id").asText();
+
+        mockMvc.perform(post("/api/demands/{id}/applications/{applicationId}/accept", demandId, applicationId)
+                        .header("token", aliceToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.takerId").isNotEmpty());
+        System.out.println("[Integration Test] ✓ Alice selected Bob as taker");
+
+        // --- Step 9: Verify demand status changed ---
         mockMvc.perform(get("/api/demands/{id}", demandId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.status").value("IN_PROGRESS"));
         System.out.println("[Integration Test] ✓ Demand status updated to IN_PROGRESS");
 
-        // --- Step 9: Alice views published demands ---
+        // --- Step 10: Bob can now see sensitive pickup code ---
+        mockMvc.perform(get("/api/demands/{id}", demandId)
+                        .header("token", bobToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.pickupCode").value("A123"));
+        System.out.println("[Integration Test] ✓ Bob can view pickup code after acceptance");
+
+        // --- Step 11: Alice views published demands ---
         mockMvc.perform(get("/api/demands/mine/published")
                         .header("token", aliceToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data[0].title").value("出售二手教材"));
+                .andExpect(jsonPath("$.data[0].title").value("帮取东门快递"));
         System.out.println("[Integration Test] ✓ Alice viewed published demands");
 
-        // --- Step 10: Bob views accepted demands ---
+        // --- Step 12: Bob views accepted demands ---
         mockMvc.perform(get("/api/demands/mine/accepted")
                         .header("token", bobToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
-                .andExpect(jsonPath("$.data[0].title").value("出售二手教材"));
+                .andExpect(jsonPath("$.data[0].title").value("帮取东门快递"));
         System.out.println("[Integration Test] ✓ Bob viewed accepted demands");
 
         // --- Step 11: Alice views user profile ---
@@ -367,7 +396,7 @@ class IntegrationTest {
                             .header("token", token))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(400))
-                    .andExpect(jsonPath("$.message").value("不能接取自己发布的需求"));
+                    .andExpect(jsonPath("$.message").value("不能申请自己发布的需求"));
         }
 
         @Test

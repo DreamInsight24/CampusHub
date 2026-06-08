@@ -43,16 +43,6 @@
               已结束
             </el-button>
             <el-button
-              v-else-if="!isApplicationDemand"
-              type="primary"
-              :icon="Check"
-              :loading="responding"
-              :disabled="demand.status !== 'OPEN'"
-              @click="respond"
-            >
-              接取需求
-            </el-button>
-            <el-button
               :icon="ChatDotRound"
               :loading="creatingConversation"
               :disabled="!demand.publisherId"
@@ -216,7 +206,7 @@ const typeLabel = computed(() => (demand.value ? typeMap[demand.value.type] : ''
 const statusLabel = computed(() => (demand.value ? statusMap[demand.value.status] : ''))
 const isPublisher = computed(() => demand.value?.publisherId === authStore.user?.id)
 const normalizedType = computed(() => (demand.value?.type === 'TEAM' ? 'TEAMUP' : demand.value?.type))
-const isApplicationDemand = computed(() => normalizedType.value === 'EXPRESS' || normalizedType.value === 'TEAMUP')
+const isApplicationDemand = computed(() => Boolean(demand.value && normalizedType.value !== 'SECONDHAND'))
 const canOperateDemand = computed(() => Boolean(demand.value && !['CLOSED', 'CANCELLED'].includes(demand.value.status)))
 const canReviewApplications = computed(() => Boolean(demand.value?.status === 'OPEN'))
 const canApply = computed(() =>
@@ -236,7 +226,7 @@ const applicationButtonText = computed(() => {
     return '已申请，等待确认'
   }
   if (myApplication.value?.status === 'ACCEPTED') {
-    return normalizedType.value === 'EXPRESS' ? '已接受' : '已加入'
+    return '已通过'
   }
   if (myApplication.value?.status === 'REJECTED') {
     return '已拒绝'
@@ -244,7 +234,20 @@ const applicationButtonText = computed(() => {
   if (myApplication.value?.status === 'EXPIRED') {
     return '已失效'
   }
-  return normalizedType.value === 'EXPRESS' ? '申请接取' : '申请加入'
+  return applyButtonText.value
+})
+
+const applyButtonText = computed(() => {
+  if (normalizedType.value === 'EXPRESS') {
+    return '申请代取'
+  }
+  if (normalizedType.value === 'TUTORING') {
+    return '申请辅导'
+  }
+  if (normalizedType.value === 'TEAMUP') {
+    return '申请加入'
+  }
+  return '申请'
 })
 
 const typeFields = computed(() => {
@@ -257,7 +260,7 @@ const typeFields = computed(() => {
     return compactFields([
       ['取件地点', item.pickupLocation],
       ['送达地点', item.deliveryLocation],
-      ['取件码', item.pickupCode],
+      ['取件码', item.pickupCode || '接单后可见'],
       ['期望送达时间', formatTime(item.expectedDeliveryTime)],
     ])
   }
@@ -345,7 +348,7 @@ async function respond() {
     }
     demand.value = response.data.data
     await loadApplicationContext()
-    ElMessage.success(isApplicationDemand.value ? '申请已提交' : '已接取需求')
+    ElMessage.success('申请已提交，等待发布者确认')
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '操作失败')
   } finally {

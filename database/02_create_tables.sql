@@ -175,6 +175,20 @@ CREATE TABLE IF NOT EXISTS `demand_application` (
   COLLATE=utf8mb4_unicode_ci
   COMMENT='Demand application table';
 
+CREATE TABLE IF NOT EXISTS `demand_favorite` (
+  `user_uuid` CHAR(36) NOT NULL COMMENT 'Favorite owner user UUID',
+  `demand_uuid` CHAR(36) NOT NULL COMMENT 'Favorited demand UUID',
+  `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'Creation time',
+  CONSTRAINT `pk_demand_favorite` PRIMARY KEY (`user_uuid`, `demand_uuid`),
+  KEY `idx_demand_favorite_demand` (`demand_uuid`),
+  KEY `idx_demand_favorite_create_time` (`create_time`),
+  CONSTRAINT `fk_demand_favorite_user` FOREIGN KEY (`user_uuid`) REFERENCES `user` (`uuid`),
+  CONSTRAINT `fk_demand_favorite_demand` FOREIGN KEY (`demand_uuid`) REFERENCES `demand` (`uuid`)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci
+  COMMENT='User demand favorite table';
+
 CREATE TABLE IF NOT EXISTS `review` (
   `review_id` BIGINT NOT NULL AUTO_INCREMENT COMMENT 'Review primary key',
   `order_id` BIGINT NOT NULL COMMENT 'Related order ID',

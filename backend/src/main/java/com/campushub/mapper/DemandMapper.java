@@ -60,6 +60,8 @@ public interface DemandMapper {
 
     List<DemandDetailVO> selectAcceptedDemandDetails(@Param("user_uuid") UUID user_uuid);
 
+    List<DemandDetailVO> selectFavoriteDemandDetails(@Param("user_uuid") UUID user_uuid);
+
     int insertExpressDemandDetail(ExpressDemandDetail detail);
 
     int insertSecondhandDemandDetail(SecondhandDemandDetail detail);
@@ -107,4 +109,12 @@ public interface DemandMapper {
             @Param("accepted_uuid") UUID accepted_uuid);
 
     int expirePendingApplicationsByDemand(@Param("demand_uuid") UUID demand_uuid);
+
+    int insertDemandFavorite(
+            @Param("user_uuid") UUID user_uuid,
+            @Param("demand_uuid") UUID demand_uuid);
+
+    int deleteDemandFavorite(
+            @Param("user_uuid") UUID user_uuid,
+            @Param("demand_uuid") UUID demand_uuid);
 }

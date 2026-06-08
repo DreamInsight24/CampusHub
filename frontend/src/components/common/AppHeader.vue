@@ -7,7 +7,8 @@
 
     <nav class="nav-links" aria-label="主导航">
       <RouterLink to="/demands">需求广场</RouterLink>
-      <RouterLink to="/demands/mine">我的需求</RouterLink>
+      <RouterLink to="/demands/mine">我的订单</RouterLink>
+      <RouterLink to="/demands/favorites">我的收藏</RouterLink>
       <RouterLink to="/messages">消息</RouterLink>
     </nav>
 

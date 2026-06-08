@@ -62,3 +62,15 @@ export function fetchMyPublishedDemands() {
 export function fetchMyAcceptedDemands() {
   return http.get<ApiResult<Demand[]>>('/demands/mine/accepted')
 }
+
+export function fetchMyFavoriteDemands() {
+  return http.get<ApiResult<Demand[]>>('/demands/favorites')
+}
+
+export function favoriteDemand(id: string) {
+  return http.post<ApiResult<null>>(`/demands/${id}/favorite`)
+}
+
+export function unfavoriteDemand(id: string) {
+  return http.delete<ApiResult<null>>(`/demands/${id}/favorite`)
+}
