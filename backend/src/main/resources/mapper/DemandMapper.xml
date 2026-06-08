@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campushub.mapper.DemandMapper">
+
+    <resultMap id="DemandListResultMap" type="com.campushub.vo.demand.DemandListVO">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="description" property="description"/>
+        <result column="type" property="type"/>
+        <result column="status" property="status"/>
+        <result column="publisher_id" property="publisherId"/>
+        <result column="publisher_name" property="publisherName"/>
+        <result column="location" property="location"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="deadline" property="deadline"/>
+        <result column="response_count" property="responseCount"/>
+    </resultMap>
+
+    <resultMap id="DemandEntityResultMap" type="com.campushub.entity.demand.Demand">
+        <id column="uuid" property="uuid"/>
+        <result column="publisher_uuid" property="publisher_uuid"/>
+        <result column="taker_uuid" property="taker_uuid"/>
+        <result column="title" property="title"/>
+        <result column="location" property="location"/>
+        <result column="deadline" property="deadline"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="type" property="type"/>
+        <result column="stat" property="stat"/>
+    </resultMap>
+
+    <resultMap id="DemandApplicationEntityResultMap" type="com.campushub.entity.demand.DemandApplication">
+        <id column="uuid" property="uuid"/>
+        <result column="demand_uuid" property="demandUuid"/>
+        <result column="applicant_uuid" property="applicantUuid"/>
+        <result column="statement" property="statement"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="DemandApplicationVOResultMap" type="com.campushub.vo.demand.DemandApplicationVO">
+        <id column="id" property="id"/>
+        <result column="demand_id" property="demandId"/>
+        <result column="applicant_id" property="applicantId"/>
+        <result column="applicant_name" property="applicantName"/>
+        <result column="applicant_avatar" property="applicantAvatar"/>
+        <result column="statement" property="statement"/>
+        <result column="status" property="status"/>
+        <result column="applied_at" property="appliedAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <resultMap id="DemandDetailResultMap" type="com.campushub.vo.demand.DemandDetailVO">
+        <id column="id" property="id"/>
+        <result column="title" property="title"/>
+        <result column="description" property="description"/>
+        <result column="type" property="type"/>
+        <result column="status" property="status"/>
+        <result column="publisher_id" property="publisherId"/>
+        <result column="publisher_name" property="publisherName"/>
+        <result column="taker_id" property="takerId"/>
+        <result column="location" property="location"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="deadline" property="deadline"/>
+        <result column="response_count" property="responseCount"/>
+        <result column="image_urls" property="imageUrls" typeHandler="com.campushub.util.JsonListTypeHandler"/>
+        <result column="pickup_location" property="pickupLocation"/>
+        <result column="delivery_location" property="deliveryLocation"/>
+        <result column="pickup_code" property="pickupCode"/>
+        <result column="expected_delivery_time" property="expectedDeliveryTime"/>
+        <result column="item_name" property="itemName"/>
+        <result column="category" property="category"/>
+        <result column="price" property="price"/>
+        <result column="original_price" property="originalPrice"/>
+        <result column="condition_level" property="conditionLevel"/>
+        <result column="trade_location" property="tradeLocation"/>
+        <result column="subject" property="subject"/>
+        <result column="tutoring_mode" property="tutoringMode"/>
+        <result column="expected_time" property="expectedTime"/>
+        <result column="duration" property="duration"/>
+        <result column="level_requirement" property="levelRequirement"/>
+        <result column="team_goal" property="teamGoal"/>
+        <result column="current_members" property="currentMembers"/>
+        <result column="expected_members" property="expectedMembers"/>
+        <result column="required_skills" property="requiredSkills" typeHandler="com.campushub.util.JsonListTypeHandler"/>
+        <result column="contact_method" property="contactMethod"/>
+    </resultMap>
+
+    <insert id="insertDemand" parameterType="com.campushub.entity.demand.Demand">
+        INSERT INTO demand (uuid, publisher_uuid, title, location, deadline, create_time, update_time, type, stat)
+        VALUES (#{uuid}, #{publisher_uuid}, #{title}, #{location}, #{deadline}, #{createTime}, #{updateTime}, #{type}, #{stat})
+    </insert>
+
+    <insert id="insertExpressDemandDetail" parameterType="com.campushub.entity.demand.ExpressDemandDetail">
+        INSERT INTO express_demand_detail (
+            demand_uuid, pickup_location, delivery_location, pickup_code,
+            expected_delivery_time, image_urls, description, dialog_uuid
+        )
+        VALUES (
+            #{demand_uuid}, #{pickup_location}, #{delivery_location}, #{pickup_code},
+            #{expected_delivery_time}, #{image_urls, typeHandler=com.campushub.util.JsonListTypeHandler},
+            #{description}, #{dialog_uuid}
+        )
+    </insert>
+
+    <insert id="insertSecondhandDemandDetail" parameterType="com.campushub.entity.demand.SecondhandDemandDetail">
+        INSERT INTO secondhand_demand_detail (
+            demand_uuid, item_name, category, price, original_price,
+            condition_level, trade_location, image_urls, description, dialog_uuid
+        )
+        VALUES (
+            #{demand_uuid}, #{item_name}, #{category}, #{price}, #{original_price},
+            #{condition_level}, #{trade_location},
+            #{image_urls, typeHandler=com.campushub.util.JsonListTypeHandler}, #{description}, #{dialog_uuid}
+        )
+    </insert>
+
+    <insert id="insertTutoringDemandDetail" parameterType="com.campushub.entity.demand.TutoringDemandDetail">
+        INSERT INTO tutoring_demand_detail (
+            demand_uuid, subject, tutoring_mode, expected_time, duration,
+            level_requirement, image_urls, description, dialog_uuid
+        )
+        VALUES (
+            #{demand_uuid}, #{subject}, #{tutoring_mode}, #{expected_time}, #{duration},
+            #{level_requirement}, #{image_urls, typeHandler=com.campushub.util.JsonListTypeHandler},
+            #{description}, #{dialog_uuid}
+        )
+    </insert>
+
+    <insert id="insertTeamupDemandDetail" parameterType="com.campushub.entity.demand.TeamupDemandDetail">
+        INSERT INTO teamup_demand_detail (
+            demand_uuid, team_goal, current_members, expected_members,
+            required_skills, deadline, contact_method, image_urls, description, dialog_uuid
+        )
+        VALUES (
+            #{demand_uuid}, #{team_goal}, #{current_members}, #{expected_members},
+            #{required_skills, typeHandler=com.campushub.util.JsonListTypeHandler},
+            #{deadline}, #{contact_method},
+            #{image_urls, typeHandler=com.campushub.util.JsonListTypeHandler}, #{description}, #{dialog_uuid}
+        )
+    </insert>
+
+    <insert id="insertDemandApplication" parameterType="com.campushub.entity.demand.DemandApplication">
+        INSERT INTO demand_application (
+            uuid, demand_uuid, applicant_uuid, statement, status, create_time, update_time
+        )
+        VALUES (
+            #{uuid}, #{demandUuid}, #{applicantUuid}, #{statement}, #{status},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateDemandStat">
+        UPDATE demand
+        SET stat = #{stat},
+            update_time = NOW(),
+            end_time = CASE
+                WHEN #{stat} IN ('CLOSED', 'CANCELLED') THEN NOW()
+                ELSE end_time
+            END
+        WHERE uuid = #{uuid}
+    </update>
+
+    <update id="updateDemandStatByPublisher">
+        UPDATE demand
+        SET stat = #{stat},
+            update_time = NOW(),
+            end_time = CASE
+                WHEN #{stat} IN ('CLOSED', 'CANCELLED') THEN NOW()
+                ELSE end_time
+            END
+        WHERE uuid = #{uuid}
+          AND publisher_uuid = #{publisher_uuid}
+          AND stat NOT IN ('CLOSED', 'CANCELLED')
+    </update>
+
+    <update id="updateDemandTaker">
+        UPDATE demand
+        SET taker_uuid = #{taker_uuid},
+            stat = 'IN_PROGRESS',
+            update_time = NOW()
+        WHERE uuid = #{uuid}
+          AND taker_uuid IS NULL
+          AND stat = 'OPEN'
+    </update>
+
+    <update id="updateTeamupCurrentMembers">
+        UPDATE teamup_demand_detail
+        SET current_members = COALESCE(current_members, 0) + 1
+        WHERE demand_uuid = #{demand_uuid}
+    </update>
+
+    <update id="updateDemandApplicationStatus">
+        UPDATE demand_application
+        SET status = #{status},
+            update_time = NOW()
+        WHERE uuid = #{uuid}
+    </update>
+
+    <update id="expireOtherPendingApplications">
+        UPDATE demand_application
+        SET status = 'EXPIRED',
+            update_time = NOW()
+        WHERE demand_uuid = #{demand_uuid}
+          AND uuid != #{accepted_uuid}
+          AND status = 'PENDING'
+    </update>
+
+    <update id="expirePendingApplicationsByDemand">
+        UPDATE demand_application
+        SET status = 'EXPIRED',
+            update_time = NOW()
+        WHERE demand_uuid = #{demand_uuid}
+          AND status = 'PENDING'
+    </update>
+
+    <select id="selectDemandByUuid" resultMap="DemandEntityResultMap">
+        SELECT * FROM demand WHERE uuid = #{uuid}
+    </select>
+
+    <sql id="DemandSearchWhere">
+        <where>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (
+                    d.title LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR dd.description LIKE CONCAT('%', #{query.keyword}, '%')
+                )
+            </if>
+            <if test="query.type != null">
+                AND d.type = #{query.type}
+            </if>
+            <if test="query.status != null">
+                AND d.stat = #{query.status}
+            </if>
+        </where>
+    </sql>
+
+    <select id="searchDemands" resultMap="DemandListResultMap">
+        SELECT
+            d.uuid AS id,
+            d.title,
+            COALESCE(dd.description, '') AS description,
+            d.type,
+            d.stat AS status,
+            d.publisher_uuid AS publisher_id,
+            COALESCE(ud.nickname, u.username) AS publisher_name,
+            d.location,
+            d.create_time AS created_at,
+            COALESCE(d.deadline, dd.deadline) AS deadline,
+            (
+                SELECT COUNT(1)
+                FROM demand_application da
+                WHERE da.demand_uuid = d.uuid
+            ) AS response_count
+        FROM demand d
+        LEFT JOIN `user` u ON d.publisher_uuid = u.uuid
+        LEFT JOIN user_detail ud ON u.uuid = ud.user_uuid
+        LEFT JOIN (
+            SELECT demand_uuid, description, NULL AS deadline FROM express_demand_detail
+            UNION ALL
+            SELECT demand_uuid, description, NULL AS deadline FROM secondhand_demand_detail
+            UNION ALL
+            SELECT demand_uuid, description, NULL AS deadline FROM tutoring_demand_detail
+            UNION ALL
+            SELECT demand_uuid, description, deadline FROM teamup_demand_detail
+        ) dd ON d.uuid = dd.demand_uuid
+        <include refid="DemandSearchWhere"/>
+        <choose>
+            <when test="query.sort == 'deadline'">
+                ORDER BY d.deadline ASC
+            </when>
+            <otherwise>
+                ORDER BY d.create_time DESC
+            </otherwise>
+        </choose>
+        LIMIT #{query.pageSize}
+        OFFSET #{offset}
+    </select>
+
+    <select id="countDemands" resultType="long">
+        SELECT COUNT(1)
+        FROM demand d
+        LEFT JOIN (
+            SELECT demand_uuid, description FROM express_demand_detail
+            UNION ALL
+            SELECT demand_uuid, description FROM secondhand_demand_detail
+            UNION ALL
+            SELECT demand_uuid, description FROM tutoring_demand_detail
+            UNION ALL
+            SELECT demand_uuid, description FROM teamup_demand_detail
+        ) dd ON d.uuid = dd.demand_uuid
+        <include refid="DemandSearchWhere"/>
+    </select>
+
+    <sql id="DemandDetailSelect">
+        SELECT
+            d.uuid AS id,
+            d.title,
+            COALESCE(ed.description, sd.description, td.description, tmd.description, '') AS description,
+            d.type,
+            d.stat AS status,
+            d.publisher_uuid AS publisher_id,
+            COALESCE(ud.nickname, u.username) AS publisher_name,
+            d.taker_uuid AS taker_id,
+            d.location,
+            d.create_time AS created_at,
+            d.update_time AS updated_at,
+            COALESCE(d.deadline, tmd.deadline) AS deadline,
+            (
+                SELECT COUNT(1)
+                FROM demand_application da
+                WHERE da.demand_uuid = d.uuid
+            ) AS response_count,
+            COALESCE(ed.image_urls, sd.image_urls, td.image_urls, tmd.image_urls) AS image_urls,
+            ed.pickup_location,
+            ed.delivery_location,
+            ed.pickup_code,
+            ed.expected_delivery_time,
+            sd.item_name,
+            sd.category,
+            sd.price,
+            sd.original_price,
+            sd.condition_level,
+            sd.trade_location,
+            td.subject,
+            td.tutoring_mode,
+            td.expected_time,
+            td.duration,
+            td.level_requirement,
+            tmd.team_goal,
+            tmd.current_members,
+            tmd.expected_members,
+            tmd.required_skills,
+            tmd.contact_method
+        FROM demand d
+        LEFT JOIN `user` u ON d.publisher_uuid = u.uuid
+        LEFT JOIN user_detail ud ON u.uuid = ud.user_uuid
+        LEFT JOIN express_demand_detail ed ON d.uuid = ed.demand_uuid
+        LEFT JOIN secondhand_demand_detail sd ON d.uuid = sd.demand_uuid
+        LEFT JOIN tutoring_demand_detail td ON d.uuid = td.demand_uuid
+        LEFT JOIN teamup_demand_detail tmd ON d.uuid = tmd.demand_uuid
+    </sql>
+
+    <select id="selectDemandDetailByUuid" resultMap="DemandDetailResultMap">
+        <include refid="DemandDetailSelect"/>
+        WHERE d.uuid = #{uuid}
+    </select>
+
+    <select id="selectPublishedDemandDetails" resultMap="DemandDetailResultMap">
+        <include refid="DemandDetailSelect"/>
+        WHERE d.publisher_uuid = #{user_uuid}
+        ORDER BY d.create_time DESC
+    </select>
+
+    <select id="selectAcceptedDemandDetails" resultMap="DemandDetailResultMap">
+        <include refid="DemandDetailSelect"/>
+        WHERE d.taker_uuid = #{user_uuid}
+           OR EXISTS (
+               SELECT 1
+               FROM demand_application da
+               WHERE da.demand_uuid = d.uuid
+                 AND da.applicant_uuid = #{user_uuid}
+                 AND da.status = 'ACCEPTED'
+           )
+        ORDER BY d.update_time DESC
+    </select>
+
+    <sql id="DemandApplicationSelect">
+        SELECT
+            da.uuid AS id,
+            da.demand_uuid AS demand_id,
+            da.applicant_uuid AS applicant_id,
+            COALESCE(ud.nickname, u.username, da.applicant_uuid) AS applicant_name,
+            ud.avatar_url AS applicant_avatar,
+            da.statement,
+            da.status,
+            da.create_time AS applied_at,
+            da.update_time AS updated_at
+        FROM demand_application da
+        LEFT JOIN `user` u ON da.applicant_uuid = u.uuid
+        LEFT JOIN user_detail ud ON da.applicant_uuid = ud.user_uuid
+    </sql>
+
+    <select id="selectDemandApplicationByUuid" resultMap="DemandApplicationEntityResultMap">
+        SELECT * FROM demand_application WHERE uuid = #{uuid}
+    </select>
+
+    <select id="selectDemandApplicationVOByUuid" resultMap="DemandApplicationVOResultMap">
+        <include refid="DemandApplicationSelect"/>
+        WHERE da.uuid = #{uuid}
+    </select>
+
+    <select id="selectDemandApplicationByDemandAndApplicant" resultMap="DemandApplicationVOResultMap">
+        <include refid="DemandApplicationSelect"/>
+        WHERE da.demand_uuid = #{demand_uuid}
+          AND da.applicant_uuid = #{applicant_uuid}
+        ORDER BY da.create_time DESC
+        LIMIT 1
+    </select>
+
+    <select id="selectDemandApplications" resultMap="DemandApplicationVOResultMap">
+        <include refid="DemandApplicationSelect"/>
+        WHERE da.demand_uuid = #{demand_uuid}
+        ORDER BY da.create_time DESC
+    </select>
+</mapper>

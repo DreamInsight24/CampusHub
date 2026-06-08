@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.campushub.mapper.UsersMapper">
+
+    <resultMap id="UserResultMap" type="com.campushub.entity.User">
+        <id column="uuid" property="uuid" javaType="java.util.UUID"/>
+        <result column="username" property="username"/>
+        <result column="password_hash" property="passwordHash"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <resultMap id="UserDetailResultMap" type="com.campushub.entity.UserDetail">
+        <id column="user_uuid" property="userUuid" javaType="java.util.UUID"/>
+        <result column="nickname" property="nickname"/>
+        <result column="phone" property="phone"/>
+        <result column="email" property="email"/>
+        <result column="avatar_url" property="avatarUrl"/>
+        <result column="credit_score" property="creditScore"/>
+        <result column="bio" property="bio"/>
+        <result column="school" property="school"/>
+        <result column="major" property="major"/>
+        <result column="grade" property="grade"/>
+        <result column="interests" property="interests" javaType="java.util.List" jdbcType="VARCHAR"
+                typeHandler="com.campushub.util.JsonListTypeHandler"/>
+        <result column="tags" property="tags" javaType="java.util.List" jdbcType="VARCHAR"
+                typeHandler="com.campushub.util.JsonListTypeHandler"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insertUser" parameterType="com.campushub.entity.User">
+        INSERT INTO `user` (uuid, username, password_hash, status, create_time, update_time)
+        VALUES (#{uuid}, #{username}, #{passwordHash}, #{status}, #{createTime}, #{updateTime})
+    </insert>
+
+    <insert id="insertUserDetail" parameterType="com.campushub.entity.UserDetail">
+        INSERT INTO `user_detail` (
+            user_uuid, nickname, phone, email, avatar_url, credit_score,
+            bio, school, major, grade, interests, tags, create_time, update_time
+        )
+        VALUES (
+            #{userUuid}, #{nickname}, #{phone}, #{email}, #{avatarUrl}, #{creditScore},
+            #{bio}, #{school}, #{major}, #{grade},
+            #{interests, typeHandler=com.campushub.util.JsonListTypeHandler},
+            #{tags, typeHandler=com.campushub.util.JsonListTypeHandler},
+            #{createTime}, #{updateTime}
+        )
+    </insert>
+
+    <update id="updateUser" parameterType="com.campushub.entity.User">
+        UPDATE `user`
+        SET username     = #{username},
+            password_hash = #{passwordHash},
+            status       = #{status},
+            update_time  = #{updateTime}
+        WHERE uuid = #{uuid}
+    </update>
+
+    <update id="updateUserDetail" parameterType="com.campushub.entity.UserDetail">
+        UPDATE `user_detail`
+        SET nickname    = #{nickname},
+            phone       = #{phone},
+            email       = #{email},
+            avatar_url  = #{avatarUrl},
+            credit_score = #{creditScore},
+            bio         = #{bio},
+            school      = #{school},
+            major       = #{major},
+            grade       = #{grade},
+            interests   = #{interests, typeHandler=com.campushub.util.JsonListTypeHandler},
+            tags        = #{tags, typeHandler=com.campushub.util.JsonListTypeHandler},
+            update_time = #{updateTime}
+        WHERE user_uuid = #{userUuid}
+    </update>
+
+    <delete id="deleteUserByUuid">
+        DELETE FROM `user` WHERE uuid = #{uuid}
+    </delete>
+
+    <select id="selectUserByUuid" resultMap="UserResultMap">
+        SELECT uuid, username, password_hash, status, create_time, update_time
+        FROM `user`
+        WHERE uuid = #{uuid}
+    </select>
+
+    <select id="selectUserByUsername" resultMap="UserResultMap">
+        SELECT uuid, username, password_hash, status, create_time, update_time
+        FROM `user`
+        WHERE username = #{username}
+    </select>
+
+    <select id="selectUserDetailByUuid" resultMap="UserDetailResultMap">
+        SELECT user_uuid, nickname, phone, email, avatar_url, credit_score,
+               bio, school, major, grade, interests, tags, create_time, update_time
+        FROM `user_detail`
+        WHERE user_uuid = #{uuid}
+    </select>
+
+    <select id="selectUsersByNickname" resultMap="UserResultMap">
+        SELECT u.uuid, u.username, u.password_hash, u.status, u.create_time, u.update_time
+        FROM `user` u
+                 JOIN `user_detail` ud ON u.uuid = ud.user_uuid
+        WHERE ud.nickname LIKE CONCAT('%', #{nickname}, '%')
+    </select>
+
+    <select id="selectAllUsers" resultMap="UserResultMap">
+        SELECT uuid, username, password_hash, status, create_time, update_time
+        FROM `user`
+    </select>
+
+</mapper>

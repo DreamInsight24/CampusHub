@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.campushub.mapper.ConversationMapper">
+
+    <!-- ==================== Result Maps ==================== -->
+
+    <resultMap id="ConversationMap" type="com.campushub.entity.message.Conversation">
+        <id property="uuid" column="uuid"/>
+        <result property="demandUuid" column="demand_uuid"/>
+        <result property="engagement_uuid" column="engagement_uuid"/>
+        <result property="ownerId" column="owner_id"/>
+        <result property="participantId" column="participant_id"/>
+        <result property="status" column="status"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <resultMap id="ChatMessageMap" type="com.campushub.entity.message.ChatMessage">
+        <id property="id" column="id"/>
+        <result property="conversation_uuid" column="conversation_uuid"/>
+        <result property="user_uuid" column="user_uuid"/>
+        <result property="message" column="message"/>
+        <result property="time" column="time"/>
+        <result property="img" column="is_img"/>
+        <result property="read" column="is_read"/>  <!-- DB column is_read maps to entity field read -->
+    </resultMap>
+
+    <resultMap id="ConversationListMap" type="com.campushub.vo.message.ConversationListVO">
+        <id property="uuid" column="uuid"/>
+        <result property="demandUuid" column="demand_uuid"/>
+        <result property="demandTitle" column="demand_title"/>
+        <result property="ownerId" column="owner_id"/>
+        <result property="ownerName" column="owner_name"/>
+        <result property="participantId" column="participant_id"/>
+        <result property="participantName" column="participant_name"/>
+        <result property="status" column="status"/>
+        <result property="lastMessage" column="last_message"/>
+        <result property="lastMessageTime" column="last_message_time"/>
+        <result property="createdAt" column="created_at"/>
+        <result property="updatedAt" column="updated_at"/>
+    </resultMap>
+
+    <!-- ==================== Conversation CRUD ==================== -->
+
+    <insert id="insertConversation" parameterType="com.campushub.entity.message.Conversation">
+        INSERT INTO conversation (uuid, demand_uuid, engagement_uuid, owner_id, participant_id,
+                                  status, created_at, updated_at)
+        VALUES (#{uuid}, #{demandUuid}, #{engagement_uuid}, #{ownerId}, #{participantId},
+                #{status}, #{createdAt}, #{updatedAt})
+    </insert>
+
+    <update id="updateConversation" parameterType="com.campushub.entity.message.Conversation">
+        UPDATE conversation
+        SET demand_uuid     = #{demandUuid},
+            engagement_uuid = #{engagement_uuid},
+            owner_id        = #{ownerId},
+            participant_id  = #{participantId},
+            status          = #{status},
+            updated_at      = #{updatedAt}
+        WHERE uuid = #{uuid}
+    </update>
+
+    <update id="updateConversationStatus">
+        UPDATE conversation
+        SET status     = #{status},
+            updated_at = NOW()
+        WHERE uuid = #{uuid}
+    </update>
+
+    <delete id="deleteConversationByUuid">
+        DELETE FROM conversation
+        WHERE uuid = #{uuid}
+    </delete>
+
+    <select id="selectConversationByUuid" resultMap="ConversationMap">
+        SELECT * FROM conversation WHERE uuid = #{uuid}
+    </select>
+
+    <select id="selectAllConversations" resultMap="ConversationMap">
+        SELECT * FROM conversation ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectConversationByEngagementUuid" resultMap="ConversationMap">
+        SELECT * FROM conversation WHERE engagement_uuid = #{engagement_uuid}
+    </select>
+
+    <select id="selectConversationsByDemandUuid" resultMap="ConversationMap">
+        SELECT * FROM conversation WHERE demand_uuid = #{demand_uuid} ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectConversationsByOwnerId" resultMap="ConversationMap">
+        SELECT * FROM conversation WHERE owner_id = #{ownerId} ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectConversationsByParticipantId" resultMap="ConversationMap">
+        SELECT * FROM conversation WHERE participant_id = #{participantId} ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectConversationsByUserId" resultMap="ConversationMap">
+        SELECT * FROM conversation
+        WHERE owner_id = #{userId} OR participant_id = #{userId}
+        ORDER BY updated_at DESC
+    </select>
+
+    <select id="selectConversationListByUserId" resultMap="ConversationListMap">
+        SELECT
+            c.uuid,
+            c.demand_uuid,
+            d.title AS demand_title,
+            c.owner_id,
+            COALESCE(owner_detail.nickname, owner_user.username, c.owner_id) AS owner_name,
+            c.participant_id,
+            COALESCE(participant_detail.nickname, participant_user.username, c.participant_id) AS participant_name,
+            c.status,
+            last_msg.message AS last_message,
+            last_msg.time AS last_message_time,
+            c.created_at,
+            c.updated_at
+        FROM conversation c
+        LEFT JOIN demand d ON c.demand_uuid = d.uuid
+        LEFT JOIN `user` owner_user ON c.owner_id = owner_user.uuid
+        LEFT JOIN user_detail owner_detail ON c.owner_id = owner_detail.user_uuid
+        LEFT JOIN `user` participant_user ON c.participant_id = participant_user.uuid
+        LEFT JOIN user_detail participant_detail ON c.participant_id = participant_detail.user_uuid
+        LEFT JOIN chat_message last_msg ON last_msg.id = (
+            SELECT cm.id
+            FROM chat_message cm
+            WHERE cm.conversation_uuid = c.uuid
+            ORDER BY cm.time DESC, cm.id DESC
+            LIMIT 1
+        )
+        WHERE c.owner_id = #{userId} OR c.participant_id = #{userId}
+        ORDER BY COALESCE(last_msg.time, c.updated_at) DESC
+    </select>
+
+    <select id="selectConversationsByStatus" resultMap="ConversationMap">
+        SELECT * FROM conversation WHERE status = #{status} ORDER BY updated_at DESC
+    </select>
+
+    <!-- ==================== ChatMessage CRUD ==================== -->
+
+    <insert id="insertChatMessage" parameterType="com.campushub.entity.message.ChatMessage"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO chat_message (conversation_uuid, user_uuid, message, time, is_img, is_read)
+        VALUES (#{conversation_uuid}, #{user_uuid}, #{message}, #{time}, #{img}, #{read})
+    </insert>
+
+    <update id="updateChatMessage" parameterType="com.campushub.entity.message.ChatMessage">
+        UPDATE chat_message
+        SET message  = #{message},
+            is_img   = #{img},
+            is_read  = #{read}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateMessagesReadByConversationUuid">
+        UPDATE chat_message
+        SET is_read = 1
+        WHERE conversation_uuid = #{conversation_uuid}
+          AND user_uuid != #{user_uuid}
+          AND is_read = 0
+    </update>
+
+    <delete id="deleteMessagesByConversationUuid">
+        DELETE FROM chat_message WHERE conversation_uuid = #{conversation_uuid}
+    </delete>
+
+    <select id="selectMessagesByConversationUuid" resultMap="ChatMessageMap">
+        SELECT * FROM chat_message
+        WHERE conversation_uuid = #{conversation_uuid}
+        ORDER BY time ASC
+    </select>
+
+    <select id="selectUnreadMessagesByConversationUuid" resultMap="ChatMessageMap">
+        SELECT * FROM chat_message
+        WHERE conversation_uuid = #{conversation_uuid}
+          AND user_uuid != #{user_uuid}
+          AND is_read = 0
+        ORDER BY time ASC
+    </select>
+
+    <!-- ==================== Additional query helpers ==================== -->
+
+    <!-- Check if a conversation already exists for the same demand and two users -->
+    <select id="selectConversationByDemandAndUsers" resultMap="ConversationMap">
+        SELECT * FROM conversation
+        WHERE demand_uuid = #{demandUuid}
+          AND ((owner_id = #{userA} AND participant_id = #{userB})
+               OR (owner_id = #{userB} AND participant_id = #{userA}))
+        LIMIT 1
+    </select>
+
+    <!-- Update conversation updated_at timestamp -->
+    <update id="touchConversation">
+        UPDATE conversation SET updated_at = NOW() WHERE uuid = #{uuid}
+    </update>
+
+</mapper>
